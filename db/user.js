@@ -13,17 +13,31 @@ async function createUser(username, password) {
     password: await bcrypt.hash(password, 10),
     last_active: now
   }
-  await knex('users').insert(user)
+  await knex.transaction(function (trx) {
+    return knex('users')
+        .insert(user)
+        .transacting(trx)
+  })
   return user
 }
 
 async function getUserById(id) {
-  const user = await knex('users').where('id', id).first()
+  const user = await knex.transaction(function (trx) {
+    return knex('users')
+        .where('id', id)
+        .first()
+        .transacting(trx)
+  })
   return undefinied(user) ? null : user
 }
 
 async function getUserByUsername(username) {
-  const user = await knex('users').where('username', username).first()
+  const user = await knex.transaction(function (trx) {
+    return knex('users')
+        .where('username', username)
+        .first()
+        .transacting(trx)
+  })
   return undefinied(user) ? null : user
 }
 

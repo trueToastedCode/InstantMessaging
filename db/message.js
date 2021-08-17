@@ -16,12 +16,21 @@ async function createMessage(sender_id, receiver_id, data) {
     submit_date: tstamp.tstamp(),
     data: data
   }
-  await knex('messages').insert(message)
+  await knex.transaction(function (trx) {
+    return knex('messages')
+        .insert(message)
+        .transacting(trx)
+  })
   return message
 }
 
-async function getMessageById(message_id) {
-  const message = await knex('messages').where('id', message_id).first()
+async function getMessageById(id) {
+  const message = await knex.transaction(function (trx) {
+    return knex('messages')
+        .where('id', id)
+        .first()
+        .transacting(trx)
+  })
   return undefinied(message) ? null : message
 }
 

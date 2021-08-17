@@ -14,17 +14,30 @@ async function createClient(userId) {
     submit_date: now,
     last_active: now
   }
-  await knex('clients').insert(client)
+  await knex.transaction(function (trx) {
+    return knex('clients')
+        .insert(client)
+        .transacting(trx)
+  })
   return client
 }
 
 async function getClientById(id) {
-  const client = await knex('clients').where('id', id).first()
+  const client = await knex.transaction(function (trx) {
+    return knex('clients')
+        .where('id', id)
+        .first()
+        .transacting(trx)
+  })
   return undefinied(client) ? null : client
 }
 
 async function getClientsOfUser(user_id) {
-  const clients = await knex('clients').where('user_id', user_id)
+  const clients = await knex.transaction(function (trx) {
+    return knex('clients')
+        .where('user_id', user_id)
+        .transacting(trx)
+  })
   return undefinied(clients) ? [] : clients
 }
 
