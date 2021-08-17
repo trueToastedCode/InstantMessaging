@@ -2,6 +2,18 @@ POST http://localhost:3000/users/create
 Content-Type: application/json
 
 {
-  "username": "Seojo",
+  "username": "Seojo1",
   "password": "password123"
 }
+
+###
+
+POST http://localhost:3000/users/clients/create
+Content-Type: application/json
+
+{
+  "user_id": "c5c45b62-782e-418e-8bda-10f8a405b354"
+}
+
+###
+GET http://localhost:3000/users/clients/io-token?client_id=1108f70e-4b83-42e7-8f8f-6c52e4f6fed1

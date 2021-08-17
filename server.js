@@ -12,6 +12,7 @@ app.disable('x-powered-by')
 io.adapter(redis({ host: '192.168.0.10', port: 6379 }));
 
 require('./routes')(app)
+require('./io')(io)
 
 const PORT = 3000
 
