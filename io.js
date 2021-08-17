@@ -40,8 +40,9 @@ module.exports = function(io) {
    * @param {*} userId 
    * @param {*} msg 
    */
-  function emitUserMsgReceive(userId, msg) {
-    io.to(userId).emit('msgReceive', msg)
+  function emitUserMsgsReceive(userId, msgs) {
+    if (msgs === undefined || msgs.length == 0) return
+    io.to(userId).emit('msgsReceive', msgs)
   }
 
   /**
@@ -49,8 +50,9 @@ module.exports = function(io) {
    * @param {*} userId 
    * @param {*} msg 
    */
-  function emitSocketMsgReceive(socket, msg) {
-    socket.emit('msgReceive', msg)
+  function emitSocketMsgsReceive(socket, msgs) {
+    if (msgs === undefined || msgs.length == 0) return
+    socket.emit('msgsReceive', msgs)
   }
 
   /**
@@ -71,11 +73,13 @@ module.exports = function(io) {
    */
    async function emitReceiveQueue(socket, clientId) {
       const sendQueue = await clientReceiveQueueDb.getQueue(clientId)
+      const msgs = [];
       for (msgId of sendQueue) {
         const msg = await messageDb.getMessageById(msgId)
         if (!msg) throw Exception('Message in send queue unrelated to an actual messaeg')
-        emitSocketMsgReceive(socket, msg)
+        msgs.push(msg)
       }
+      emitSocketMsgsReceive(socket, msgs)
     }
 
   io.on('connection', function(socket) {
@@ -115,7 +119,7 @@ module.exports = function(io) {
           ])
         })
         emitUserMsgOnServer(socket.user_id, msg.id)
-        emitUserMsgReceive(msg.receiver_id, msg)
+        emitUserMsgsReceive(msg.receiver_id, [msg])
       } catch(err) {
         console.log(err)
       }
@@ -142,9 +146,14 @@ module.exports = function(io) {
     })
 
     // the client notifies the server that it has syncronized a sended message by another user to it
-    socket.on('msgReceived', async function (msg_id) {
+    socket.on('msgsReceived', async function (msg_ids) {
       try {
-        await clientReceiveQueueDb.rmMessage(socket.client_id, msg_id)
+        await knex.transaction(function (trx) {
+          return Promise.all(JSON.parse(msg_ids)
+              .map(msg_id => clientReceiveQueueDb
+                  .rmMessageQuery(socket.client_id, msg_id)
+                  .transacting(trx)))
+        })
       } catch(err) {
         console.log(err)
       }
