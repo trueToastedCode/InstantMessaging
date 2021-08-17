@@ -24,17 +24,20 @@ async function createMessage(sender_id, receiver_id, data) {
   return message
 }
 
-async function getMessageById(id) {
-  const message = await knex.transaction(function (trx) {
-    return knex('messages')
-        .where('id', id)
-        .first()
-        .transacting(trx)
-  })
-  return undefinied(message) ? null : message
+function getMessageByIdQuery(id) {
+  return knex('messages')
+      .where('id', id)
+      .first()
+  // const message = await knex.transaction(function (trx) {
+  //   return knex('messages')
+  //       .where('id', id)
+  //       .first()
+  //       .transacting(trx)
+  // })
+  // return undefinied(message) ? null : message
 }
 
 module.exports = {
   createMessage,
-  getMessageById
+  getMessageByIdQuery
 }

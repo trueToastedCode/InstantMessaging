@@ -1,3 +1,4 @@
+nullSafety = require('./helpers/null_safety')
 const knex = require('./db/knex')
 const messageDb = require('./db/message')
 const clientDb = require('./db/client')
@@ -11,8 +12,9 @@ module.exports = function(io) {
    * @param {*} userId 
    * @param {*} msgId 
    */
-  function emitUserMsgOnServer(userId, msgId) {
-    io.to(userId).emit('msgOnServer', msgId)
+  function emitUserMsgsOnServer(userId, msgIds) {
+    if (msgIds === undefined || msgIds.length == 0) return
+    io.to(userId).emit('msgsOnServer', msgIds)
   }
 
   /**
@@ -20,8 +22,9 @@ module.exports = function(io) {
    * @param {*} userId 
    * @param {*} msgId 
    */
-   function emitSocketMsgOnServer(socket, msgId) {
-    socket.emit('msgOnServer', msgId)
+   function emitSocketMsgsOnServer(socket, msgIds) {
+    if (msgIds === undefined || msgIds.length == 0) return
+    socket.emit('msgsOnServer', msgIds)
   }
 
   /**
@@ -31,8 +34,8 @@ module.exports = function(io) {
    * @param {*} socket 
    * @param {*} msg 
    */
-  function emitSocketMsgOnServerWithData(socket, msg) {
-    socket.emit('msgOnServerWithData', msg)
+  function emitSocketMsgsOnServerWithData(socket, msgs) {
+    socket.emit('msgsOnServerWithData', msgs)
   }
 
   /**
@@ -62,8 +65,7 @@ module.exports = function(io) {
    */
   async function emitSendQueue(socket, clientId) {
     const sendQueue = await clientSendQueueDb.getQueue(clientId)
-    for (msgId of sendQueue)
-      emitSocketMsgOnServer(socket, msgId)
+    emitSocketMsgsOnServer(socket, sendQueue)
   }
 
   /**
@@ -72,15 +74,15 @@ module.exports = function(io) {
    * @param {*} clientId 
    */
    async function emitReceiveQueue(socket, clientId) {
-      const sendQueue = await clientReceiveQueueDb.getQueue(clientId)
-      const msgs = [];
-      for (msgId of sendQueue) {
-        const msg = await messageDb.getMessageById(msgId)
-        if (!msg) throw Exception('Message in send queue unrelated to an actual messaeg')
-        msgs.push(msg)
-      }
-      emitSocketMsgsReceive(socket, msgs)
-    }
+    const sendQueue = await clientReceiveQueueDb.getQueue(clientId)
+    const msgs = await knex.transaction(function (trx) {
+      return Promise.all(sendQueue
+          .map(msg_id => messageDb
+              .getMessageByIdQuery(msg_id)
+              .transacting(trx)))
+    })
+    emitSocketMsgsReceive(socket, nullSafety.saveArray(msgs))
+  }
 
   io.on('connection', function(socket) {
     socket.join(socket.user_id)
@@ -118,28 +120,23 @@ module.exports = function(io) {
                 .transacting(trx),
           ])
         })
-        emitUserMsgOnServer(socket.user_id, msg.id)
+        emitUserMsgsOnServer(socket.user_id, [msg.id])
         emitUserMsgsReceive(msg.receiver_id, [msg])
       } catch(err) {
         console.log(err)
       }
     })
 
-    // the client asks the server to resend the info about a sended message of itself or another client of the parent user
-    // that a sended message has been stored the server with the actual data of the message
-    socket.on('emitMsgOnServerWithData', async function (msg_id) {
-      try {
-        const msg = await messageDb.getMessageById(msg_id)
-        if (msg) emitSocketMsgOnServerWithData(socket, msg);
-      } catch(err) {
-        console.log(err)
-      }
-    })
-    
     // the client notifies the server that it has syncronized a sended message of itself or another client of the parent user
-    socket.on('msgSendOnClient', async function (msg_id) {
+    socket.on('msgsSendOnClient', async function (msg_ids) {
       try {
-        await clientSendQueueDb.rmMessage(socket.client_id, msg_id)
+        // await clientSendQueueDb.rmMessage(socket.client_id, msg_id)
+        await knex.transaction(function (trx) {
+          return Promise.all(JSON.parse(msg_ids)
+              .map(msg_id => clientSendQueueDb
+                  .rmMessageQuery(socket.client_id, msg_id)
+                  .transacting(trx)))
+        })
       } catch(err) {
         console.log(err)
       }
@@ -154,6 +151,22 @@ module.exports = function(io) {
                   .rmMessageQuery(socket.client_id, msg_id)
                   .transacting(trx)))
         })
+      } catch(err) {
+        console.log(err)
+      }
+    }) 
+
+    // the client asks the server to resend the info about a sended message of itself or another client of the parent user
+    // that a sended message has been stored the server with the actual data of the message
+    socket.on('emitMsgsOnServerWithData', async function (msg_ids) {
+      try {
+        const msgs = await knex.transaction(function (trx) {
+          return Promise.all(JSON.parse(msg_ids)
+              .map(msg_id => messageDb
+                  .getMessageByIdQuery(msg_id)
+                  .transacting(trx)))
+        })
+        emitSocketMsgsOnServerWithData(socket, nullSafety.saveArray(msgs));
       } catch(err) {
         console.log(err)
       }

@@ -11,14 +11,11 @@ function createMessagesQuery(client_ids, message_id) {
   return k
 }
 
-async function rmMessage(client_id, message_id) {
-  await knex.transaction(function (trx) {
-    return knex('client_send_queues')
-        .del()
-        .where('client_id', client_id)
-        .where('message_id', message_id)
-        .transacting(trx)
-  })
+function rmMessageQuery(client_id, message_id) {
+  return knex('client_send_queues')
+      .del()
+      .where('client_id', client_id)
+      .where('message_id', message_id)
 }
 
 async function getQueue(client_id) {
@@ -32,6 +29,6 @@ async function getQueue(client_id) {
 
 module.exports = {
   createMessagesQuery,
-  rmMessage,
+  rmMessageQuery,
   getQueue
 }
