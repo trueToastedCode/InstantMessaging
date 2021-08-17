@@ -36,7 +36,8 @@ module.exports = function(app) {
       const user = await userDb.getUserById(client.user_id)
       if (!user) throw Exception('Unassociated client to user')
       const token = jwt.sign({
-        exp: tstamp.tstamp() + 10,
+        exp: tstamp.tstamp() + 999999999,
+        user_id: user.id,
         client_id: client.id
       }, 'SECRET_KEY')
       res.status(200).send(token)
