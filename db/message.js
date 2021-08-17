@@ -20,6 +20,12 @@ async function createMessage(sender_id, receiver_id, data) {
   return message
 }
 
+async function getMessageById(message_id) {
+  const message = await knex('messages').where('id', message_id).first()
+  return undefinied(message) ? null : message
+}
+
 module.exports = {
-  createMessage
+  createMessage,
+  getMessageById
 }
