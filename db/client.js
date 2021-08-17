@@ -23,7 +23,13 @@ async function getClientById(id) {
   return undefinied(client) ? null : client
 }
 
+async function getClientsOfUser(user_id) {
+  const clients = await knex('clients').where('user_id', user_id)
+  return undefinied(clients) ? [] : clients
+}
+
 module.exports = {
   createClient,
-  getClientById
+  getClientById,
+  getClientsOfUser
 }

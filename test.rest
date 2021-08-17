@@ -12,8 +12,8 @@ POST http://localhost:3000/users/clients/create
 Content-Type: application/json
 
 {
-  "user_id": "47bbc93a-ca20-4bb4-8372-139124b79955"
+  "user_id": "b0110034-a0a2-438d-89fc-7fb2520cce20"
 }
 
 ###
-GET http://localhost:3000/users/clients/io-token?client_id=d941af0a-7af1-4241-a8cf-2dd5cfcb85d9
+GET http://localhost:3000/users/clients/io-token?client_id=760c522b-c6ad-45dc-81d3-77c60bdec542
