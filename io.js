@@ -1,6 +1,7 @@
 const messageDb = require('./db/message')
 const clientDb = require('./db/client')
 const clientSendQueueDb = require('./db/client_send_queue')
+const clientReceiveQueueDb = require('./db/client_receive_queue')
 
 module.exports = function(io) {
   
@@ -9,8 +10,17 @@ module.exports = function(io) {
    * @param {*} userId 
    * @param {*} msgId 
    */
-  function emitMsgOnServer(userId, msgId) {
+  function emitUserMsgOnServer(userId, msgId) {
     io.to(userId).emit('msgOnServer', msgId)
+  }
+
+  /**
+   * Notifies all clients of users that a sended message has been stored the server
+   * @param {*} userId 
+   * @param {*} msgId 
+   */
+   function emitSocketMsgOnServer(socket, msgId) {
+    socket.emit('msgOnServer', msgId)
   }
 
   /**
@@ -20,8 +30,37 @@ module.exports = function(io) {
    * @param {*} socket 
    * @param {*} msg 
    */
-  function emitMsgOnServerWithData(socket, msg) {
+  function emitSocketMsgOnServerWithData(socket, msg) {
     socket.emit('msgOnServerWithData', msg)
+  }
+
+  /**
+   * Notifies clients about a message to it
+   * @param {*} userId 
+   * @param {*} msg 
+   */
+  function emitUserMsgReceive(userId, msg) {
+    io.to(userId).emit('msgReceive', msg)
+  }
+
+  /**
+   * Notifies client about a message to it
+   * @param {*} userId 
+   * @param {*} msg 
+   */
+  function emitSocketMsgReceive(socket, msg) {
+    socket.emit('msgReceive', msg)
+  }
+
+  /**
+   * Notifies client about send queue
+   * @param {*} userId 
+   * @param {*} clientId 
+   */
+  async function emitSendQueue(socket, clientId) {
+    const sendQueue = await clientSendQueueDb.getQueue(clientId)
+    for (msgId of sendQueue)
+      emitSocketMsgOnServer(socket, msgId)
   }
 
   /**
@@ -29,11 +68,14 @@ module.exports = function(io) {
    * @param {*} userId 
    * @param {*} clientId 
    */
-  async function emitSendQueue(userId, clientId) {
-    const sendQueue = await clientSendQueueDb.getQueue(clientId)
-    for (msgId of sendQueue)
-      emitMsgOnServer(userId, msgId)
-  }
+   async function emitReceiveQueue(socket, clientId) {
+      const sendQueue = await clientReceiveQueueDb.getQueue(clientId)
+      for (msgId of sendQueue) {
+        const msg = await messageDb.getMessageById(msgId)
+        if (!msg) throw Exception('Message in send queue unrelated to an actual messaeg')
+        emitSocketMsgReceive(socket, msg)
+      }
+    }
 
   io.on('connection', function(socket) {
     socket.join(socket.user_id)
@@ -41,7 +83,12 @@ module.exports = function(io) {
 
     // send the queue/s so the client can syncronize
     try {
-      emitSendQueue(socket.user_id, socket.client_id);
+      emitSendQueue(socket, socket.client_id);
+    } catch(err) {
+      console.log(err);
+    }
+    try {
+      emitReceiveQueue(socket, socket.client_id);
     } catch(err) {
       console.log(err);
     }
@@ -50,10 +97,14 @@ module.exports = function(io) {
     socket.on('sendMsg', async function (_msg) {
       try {
         const msg = await messageDb.createMessage(socket.user_id, _msg.receiver_id, _msg.data)
-        const clients = await clientDb.getClientsOfUser(socket.user_id)
-        for (client of clients)
+        const senderClients = await clientDb.getClientsOfUser(socket.user_id)
+        const receiverClients = await clientDb.getClientsOfUser(msg.receiver_id)
+        for (client of senderClients)
           await clientSendQueueDb.createMessage(client.id, msg.id)
-        emitMsgOnServer(socket.user_id, msg.id)
+        for (client of receiverClients)
+          await clientReceiveQueueDb.createMessage(client.id, msg.id)
+        emitUserMsgOnServer(socket.user_id, msg.id)
+        emitUserMsgReceive(msg.receiver_id, msg)
       } catch(err) {
         console.log(err)
       }
@@ -64,16 +115,25 @@ module.exports = function(io) {
     socket.on('emitMsgOnServerWithData', async function (msg_id) {
       try {
         const msg = await messageDb.getMessageById(msg_id)
-        if (msg) emitMsgOnServerWithData(socket, msg);
+        if (msg) emitSocketMsgOnServerWithData(socket, msg);
       } catch(err) {
         console.log(err)
       }
     })
     
-    // the client notifes the server that it has syncronized a sended message of itself or another client of the parent user
+    // the client notifies the server that it has syncronized a sended message of itself or another client of the parent user
     socket.on('msgSendOnClient', async function (msg_id) {
       try {
         await clientSendQueueDb.rmMessage(socket.client_id, msg_id)
+      } catch(err) {
+        console.log(err)
+      }
+    })
+
+    // the client notifies the server that it has syncronized a sended message by another user to it
+    socket.on('msgReceived', async function (msg_id) {
+      try {
+        await clientReceiveQueueDb.rmMessage(socket.client_id, msg_id)
       } catch(err) {
         console.log(err)
       }
