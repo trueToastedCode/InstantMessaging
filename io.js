@@ -98,15 +98,19 @@ module.exports = function(io) {
     socket.on('sendMsg', async function (_msg) {
       try {
         const msg = await messageDb.createMessage(socket.user_id, _msg.receiver_id, _msg.data)
-        const senderClients = await clientDb.getClientsOfUser(socket.user_id)
-        const receiverClients = await clientDb.getClientsOfUser(msg.receiver_id)
+        const clients = await knex.transaction(function (trx) {
+          return Promise.all([
+            clientDb.getClientsOfUserQuery(socket.user_id).transacting(trx),
+            clientDb.getClientsOfUserQuery(msg.receiver_id).transacting(trx)
+          ])
+        })
         await knex.transaction(function (trx) {
           return Promise.all([
             clientSendQueueDb
-                .createMessagesQuery(senderClients.map(client => client.id), msg.id)
+                .createMessagesQuery(clients[0].map(client => client.id), msg.id)
                 .transacting(trx),
             clientReceiveQueueDb
-                .createMessagesQuery(receiverClients.map(client => client.id), msg.id)
+                .createMessagesQuery(clients[1].map(client => client.id), msg.id)
                 .transacting(trx),
           ])
         })

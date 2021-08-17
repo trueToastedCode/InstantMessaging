@@ -32,17 +32,12 @@ async function getClientById(id) {
   return undefinied(client) ? null : client
 }
 
-async function getClientsOfUser(user_id) {
-  const clients = await knex.transaction(function (trx) {
-    return knex('clients')
-        .where('user_id', user_id)
-        .transacting(trx)
-  })
-  return undefinied(clients) ? [] : clients
+function getClientsOfUserQuery(user_id) {
+  return knex('clients').where('user_id', user_id)
 }
 
 module.exports = {
   createClient,
   getClientById,
-  getClientsOfUser
+  getClientsOfUserQuery
 }

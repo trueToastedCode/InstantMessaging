@@ -1,19 +1,6 @@
 const knex = require('./knex')
 const undefinied = require('./../helpers/undefined')
 
-async function createMessage(client_id, message_id) {
-  const message = {
-    client_id: client_id,
-    message_id: message_id
-  }
-  await knex.transaction(function (trx) {
-    return knex('client_send_queues')
-        .insert(message)
-        .transacting(trx)
-  })
-  return message
-}
-
 function createMessagesQuery(client_ids, message_id) {
   const k = knex('client_send_queues');
   for (client_id of client_ids)
@@ -44,7 +31,6 @@ async function getQueue(client_id) {
 }
 
 module.exports = {
-  createMessage,
   createMessagesQuery,
   rmMessage,
   getQueue
