@@ -1,3 +1,4 @@
+const knex = require('./db/knex')
 const messageDb = require('./db/message')
 const clientDb = require('./db/client')
 const clientSendQueueDb = require('./db/client_send_queue')
@@ -99,10 +100,16 @@ module.exports = function(io) {
         const msg = await messageDb.createMessage(socket.user_id, _msg.receiver_id, _msg.data)
         const senderClients = await clientDb.getClientsOfUser(socket.user_id)
         const receiverClients = await clientDb.getClientsOfUser(msg.receiver_id)
-        for (client of senderClients)
-          await clientSendQueueDb.createMessage(client.id, msg.id)
-        for (client of receiverClients)
-          await clientReceiveQueueDb.createMessage(client.id, msg.id)
+        await knex.transaction(function (trx) {
+          return Promise.all([
+            clientSendQueueDb
+                .createMessagesQuery(senderClients.map(client => client.id), msg.id)
+                .transacting(trx),
+            clientReceiveQueueDb
+                .createMessagesQuery(receiverClients.map(client => client.id), msg.id)
+                .transacting(trx),
+          ])
+        })
         emitUserMsgOnServer(socket.user_id, msg.id)
         emitUserMsgReceive(msg.receiver_id, msg)
       } catch(err) {

@@ -14,6 +14,16 @@ async function createMessage(client_id, message_id) {
   return message
 }
 
+function createMessagesQuery(client_ids, message_id) {
+  const k = knex('client_receive_queues');
+  for (client_id of client_ids)
+    k.insert({
+      client_id: client_id,
+      message_id: message_id
+    })
+  return k
+}
+
 async function rmMessage(client_id, message_id) {
   await knex.transaction(function (trx) {
     return knex('client_receive_queues')
@@ -35,6 +45,7 @@ async function getQueue(client_id) {
 
 module.exports = {
   createMessage,
+  createMessagesQuery,
   rmMessage,
   getQueue
 }
