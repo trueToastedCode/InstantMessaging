@@ -35,6 +35,7 @@ module.exports = function(io) {
    * @param {*} msg 
    */
   function emitSocketMsgsOnServerWithData(socket, msgs) {
+    if (msgs === undefined || msgs.length == 0) return
     socket.emit('msgsOnServerWithData', msgs)
   }
 
