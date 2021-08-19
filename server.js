@@ -11,7 +11,7 @@ const io = socketio(server)
 
 app.use(express.json())
 app.disable('x-powered-by')
-io.adapter(redis({ host: '192.168.0.10', port: 6379 }));
+io.adapter(redis({ host: '127.0.0.1', port: 6379 }));
 io.use(function(socket, next) {
   if (socket.handshake.query && socket.handshake.query.token) {
     jwt.verify(socket.handshake.query.token, 'SECRET_KEY', function(err, decoded) {

@@ -17,6 +17,21 @@ module.exports = function(app) {
     }
   })
 
+  app.get('/users/get', async (req, res) => {
+    try {
+      const user = await userDb.getUserById(req.query.id)
+      if (!user) return res.sendStatus(400)
+      res.status(200).send({
+        id: user.id,
+        submit_date: user.submit_date,
+        username: user.username,
+        last_active: user.last_active
+      })
+    } catch {
+      res.sendStatus(500)
+    }
+  })
+
   app.post('/users/clients/create', async (req, res) => {
     try {
       const client = await clientDb.createClient(req.body.user_id)

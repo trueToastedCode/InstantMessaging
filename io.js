@@ -104,7 +104,7 @@ module.exports = function(io) {
     // client sends a message to user
     socket.on('sendMsg', async function (_msg) {
       try {
-        const msg = await messageDb.createMessage(socket.user_id, _msg.receiver_id, _msg.data)
+        const msg = await messageDb.createMessage(_msg.id, socket.user_id, _msg.receiver_id, _msg.data)
         const clients = await knex.transaction(function (trx) {
           return Promise.all([
             clientDb.getClientsOfUserQuery(socket.user_id).transacting(trx),
